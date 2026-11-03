@@ -1,0 +1,46 @@
+name: Single NitroMTA delivery test
+on:
+  workflow_dispatch:
+    inputs:
+      authorize_one_message:
+        description: 'Authorize exactly one technical email to proof@nitromta.com'
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  attestations: read
+concurrency:
+  group: single-nitromta-delivery-test
+  cancel-in-progress: false
+jobs:
+  one-delivery:
+    if: ${{ inputs.authorize_one_message == true && github.run_attempt == '1' && github.run_number == 1 }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out verified test source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify and unpack official engine
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/nitromta-0.1.6-x86_64-linux.tar.gz"
+          curl --fail --location --silent --show-error --output "$archive" https://github.com/nitrosend/nitromta/releases/download/v0.1.6/nitromta-0.1.6-x86_64-linux.tar.gz
+          echo "fe77b3099badd749d185e211c7978654e26da077b69b9eba6fea72aa4b976966  $archive" | sha256sum --check
+          gh attestation verify "$archive" --repo nitrosend/nitromta
+          mkdir -p "$RUNNER_TEMP/nitromta-bin"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/nitromta-bin"
+          binary="$(find "$RUNNER_TEMP/nitromta-bin" -type f -name nitromta -print -quit)"
+          test -n "$binary"
+          echo "NITROMTA_BIN=$binary" >> "$GITHUB_ENV"
+          python3 -m venv "$RUNNER_TEMP/nitromta-sdk"
+          "$RUNNER_TEMP/nitromta-sdk/bin/pip" install --quiet boto3==1.43.123
+      - name: Submit one authorized proof message
+        env:
+          CLEARDATA_ONE_PROOF_AUTHORIZED: 'yes'
+          PROOF_REPLY_TO: ${{ secrets.PROOF_REPLY_TO }}
+        run: '"$RUNNER_TEMP/nitromta-sdk/bin/python" smoke_capture.py "$NITROMTA_BIN" --send-one-proof'
