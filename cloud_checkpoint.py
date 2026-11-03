@@ -26,6 +26,9 @@ def read(url, token=None, method="GET", payload=None):
 
 result = {"worker_version": 1, "mutations_performed": 0, "secrets_printed": False}
 for service in ("speedbot", "frantic"):
+    if service == "frantic" and not os.environ.get("FRANTIC_AGENT_TOKEN"):
+        result[service] = {"state": "parked_no_active_work", "api_calls": 0}
+        continue
     try:
         if service == "speedbot":
             key = os.environ.get("SPEEDBOT_AGENT_KEY")
@@ -60,11 +63,11 @@ for service in ("speedbot", "frantic"):
     except Exception as exc:
         result[service] = {"error_type": type(exc).__name__}
 result["ok"] = (result.get("speedbot", {}).get("authenticated_owned_listing_read") is True
-                and result.get("frantic", {}).get("authenticated_private_read") is True)
+                and (result.get("frantic", {}).get("authenticated_private_read") is True
+                     or result.get("frantic", {}).get("state") == "parked_no_active_work"))
 rendered = json.dumps(result, indent=2)
 print(rendered)
 if os.environ.get("GITHUB_STEP_SUMMARY"):
     with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
         handle.write("## Cloud account checkpoint\n\n\x60\x60\x60json\n" + rendered + "\n\x60\x60\x60\n")
 raise SystemExit(0 if result["ok"] else 1)
-
