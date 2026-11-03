@@ -1,0 +1,25 @@
+name: Cloud account checkpoint
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '37 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: cloud-account-checkpoint
+  cancel-in-progress: false
+jobs:
+  private-api-reads:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Check out fixed worker source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Read existing accounts without exposing credentials
+        env:
+          SPEEDBOT_AGENT_KEY: ${{ secrets.SPEEDBOT_AGENT_KEY }}
+          FRANTIC_AGENT_TOKEN: ${{ secrets.FRANTIC_AGENT_TOKEN }}
+        run: python3 cloud_checkpoint.py
+
