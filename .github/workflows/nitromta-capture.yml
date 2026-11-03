@@ -1,0 +1,40 @@
+name: NitroMTA capture integration
+on:
+  push:
+    paths:
+      - '.github/workflows/nitromta-capture.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  attestations: read
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out test source
+        uses: actions/checkout@v4
+      - name: Download and verify official NitroMTA release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/nitromta-0.1.6-x86_64-linux.tar.gz"
+          curl --fail --location --silent --show-error --output "$archive" https://github.com/nitrosend/nitromta/releases/download/v0.1.6/nitromta-0.1.6-x86_64-linux.tar.gz
+          echo "fe77b3099badd749d185e211c7978654e26da077b69b9eba6fea72aa4b976966  $archive" | sha256sum --check
+          gh attestation verify "$archive" --repo nitrosend/nitromta
+          mkdir -p "$RUNNER_TEMP/nitromta-bin"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/nitromta-bin"
+          binary="$(find "$RUNNER_TEMP/nitromta-bin" -type f -name nitromta -print -quit)"
+          test -n "$binary"
+          echo "NITROMTA_BIN=$binary" >> "$GITHUB_ENV"
+      - name: Install the official SES SDK in a temporary environment
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/nitromta-sdk"
+          "$RUNNER_TEMP/nitromta-sdk/bin/pip" install --quiet boto3
+      - name: Exercise capture mode and probe TLS without external email
+        shell: bash
+        run: '"$RUNNER_TEMP/nitromta-sdk/bin/python" smoke_capture.py "$NITROMTA_BIN"'
+
