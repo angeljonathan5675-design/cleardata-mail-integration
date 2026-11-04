@@ -7,6 +7,11 @@ on:
         required: false
         type: boolean
         default: false
+      verify_near_credentials:
+        description: 'One-time verification of the owned NEAR worker token; no other service reads'
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: '37 * * * *'
 permissions:
@@ -25,6 +30,8 @@ jobs:
           persist-credentials: false
       - name: Read existing accounts without exposing credentials
         env:
-          SPEEDBOT_AGENT_KEY: ${{ secrets.SPEEDBOT_AGENT_KEY }}
-          FRANTIC_AGENT_TOKEN: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_credentials && secrets.FRANTIC_AGENT_TOKEN || '' }}
+          SPEEDBOT_AGENT_KEY: ${{ (github.event_name != 'workflow_dispatch' || !inputs.verify_near_credentials) && secrets.SPEEDBOT_AGENT_KEY || '' }}
+          NEAR_AGENT_TOKEN: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_near_credentials && secrets.NEAR_AGENT_TOKEN || '' }}
+          VERIFY_NEAR_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_near_credentials && 'true' || 'false' }}
+          FRANTIC_AGENT_TOKEN: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_credentials && !inputs.verify_near_credentials && secrets.FRANTIC_AGENT_TOKEN || '' }}
         run: python3 cloud_checkpoint.py
