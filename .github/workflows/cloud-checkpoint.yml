@@ -12,8 +12,6 @@ on:
         required: false
         type: boolean
         default: false
-  schedule:
-    - cron: '37 * * * *'
 permissions:
   contents: read
 concurrency:
@@ -35,3 +33,4 @@ jobs:
           VERIFY_NEAR_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_near_credentials && 'true' || 'false' }}
           FRANTIC_AGENT_TOKEN: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_credentials && !inputs.verify_near_credentials && secrets.FRANTIC_AGENT_TOKEN || '' }}
         run: python3 cloud_checkpoint.py
+
